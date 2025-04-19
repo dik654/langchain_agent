@@ -1,0 +1,80 @@
+\documentclass[a4paper,12pt]{article}
+
+% 폰트 설정
+\usepackage{fontspec}
+\setmainfont{NanumGothic}
+
+% 패키지
+\usepackage{tocloft}
+\renewcommand{\contentsname}{\fontsize{40pt}{40pt}\selectfont\bfseries 목차\\\rule{\textwidth}{1pt}}
+\renewcommand{\cfttoctitlefont}{}
+\renewcommand{\cftaftertoctitle}{\fontsize{16pt}{16pt}\selectfont \vskip 1em}
+\renewcommand{\cftsecfont}{\fontsize{16pt}{16pt}\selectfont}
+\renewcommand{\cftsecpagefont}{\fontsize{16pt}{16pt}\selectfont}
+\renewcommand{\cftsecafterpnum}{\vskip 0.2em}
+\renewcommand{\cftsubsecfont}{\fontsize{14pt}{14pt}\selectfont}
+\renewcommand{\cftsubsecpagefont}{\fontsize{14pt}{14pt}\selectfont}
+
+\usepackage{graphicx}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+
+\usepackage{changepage}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{eso-pic}
+\usepackage{setspace}
+\linespread{1.9}
+
+% 워터마크 로고
+\AddToShipoutPictureBG{
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[opacity=0.08, inner sep=0pt] at (current page.center) {
+      \includegraphics[width=0.5\paperwidth]{outputs/pdf/company_logo.png}
+    };
+  \end{tikzpicture}
+}
+
+\begin{document}
+
+% ---------------- 타이틀 페이지 ----------------
+\begin{titlepage}
+\begin{adjustwidth}{2.5cm}{2.5cm}
+\vspace*{4cm}
+\begin{center}
+    {\fontsize{32pt}{40pt}\selectfont \bfseries {{ title }} \par}
+    \vspace{25em}
+    {\Large 작성자: {{ author }} \par}
+    \vspace{1.5em}
+    {\large 날짜: {{ date }} \par}
+\end{center}
+\end{adjustwidth}
+\thispagestyle{empty}
+\end{titlepage}
+
+% ---------------- 목차 ----------------
+\newpage
+\tableofcontents
+\newpage
+
+% ---------------- 본문 ----------------
+{% for section in sections %}
+\section{ {{ section.title }} }
+
+{{ section.content | safe }}
+
+{% if section.subsections %}
+{% for sub in section.subsections %}
+\subsection{ {{ sub.title }} }
+
+{{ sub.content | safe }}
+
+\vspace{1em}
+{% endfor %}
+{% endif %}
+
+\newpage
+{% endfor %}
+
+\end{document}

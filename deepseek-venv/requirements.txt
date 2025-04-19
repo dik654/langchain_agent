@@ -1,0 +1,7 @@
+torch
+torchvision
+torchaudio
+vllm[torch]
+fastapi
+uvicorn[standard]
+transformers

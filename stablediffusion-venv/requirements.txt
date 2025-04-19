@@ -1,0 +1,10 @@
+diffusers
+transformers 
+torch 
+torchvision 
+safetensors
+accelerate
+deepspeed
+fastapi
+pydantic
+uvicorn
