@@ -2,7 +2,6 @@
 
 import importlib
 import inspect
-import os
 from typing import Callable, Dict
 
 class ToolRegistry:
@@ -25,33 +24,42 @@ class ToolRegistry:
             raise ValueError(f"Tool '{name}' not found.")
 
         func = tool["function"]
-        
-        # ✅ 함수가 state를 받는 형태일 경우: args는 그대로 넘김
-        if "state" in func.__code__.co_varnames:
+        sig = inspect.signature(func)
+
+        # ✅ state 기반 함수라면 state 그대로
+        if "state" in sig.parameters:
             return func(args)
 
-        # ✅ 함수가 input을 받는 형태일 경우: input만 꺼내서 넘김
+        # ✅ 아닌 경우에는 input만 꺼내서
+        if "input" not in args:
+            raise KeyError("Missing 'input' key in args for input-based tool.")
         return func(args["input"])
 
     def auto_register_builtin_tools(self, module_paths):
         for module_path in module_paths:
             try:
                 mod = importlib.import_module(module_path)
+                print(f"[REGISTRY] 모듈 로드됨: {module_path}")
 
-                for name, func in inspect.getmembers(mod, inspect.isfunction):
-                    if name.startswith(("use_", "generate_", "read_", "report_", "mock_", "direct_")):
-                        # docstring에서 첫 줄을 설명으로 사용
+                for name, func in inspect.getmembers(mod):
+                    if not (inspect.isfunction(func) or inspect.iscoroutinefunction(func)):
+                        continue
+
+                    if name.startswith(("generate_", "use_", "formatting_")):
+                        print(f"[REGISTRY] ✅ 함수 발견 및 등록 시도: {name}")
                         doc = inspect.getdoc(func)
-                        description = doc.split("\n")[0] if doc else name.replace("_", " ")
+                        description = doc if doc else name.replace("_", " ")
 
                         self.register(
                             name=name,
                             description=f"{description}",
-                            params={"input": {"type": "string"}},
+                            params={"input": {"type": "state"}},
                             func=func
                         )
-            except ModuleNotFoundError:
+            except ModuleNotFoundError as e:
+                print(f"[REGISTRY] ❌ 모듈 로딩 실패: {module_path} → {e}")
                 continue
+
 
 # 전역 인스턴스
 registry = ToolRegistry()
@@ -60,7 +68,6 @@ registry = ToolRegistry()
 builtin_modules = [
     "tools.pdf_tool",
     "tools.rag_tool",
-    "tools.txt_tool",
     "tools.report_formatter_tool",
 ]
 

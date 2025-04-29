@@ -7,7 +7,7 @@ async def test_workflow():
     print("🚀 그래프 실행 시작...\n")
 
     async for step in graph_executor.astream({
-        "input": "회사의 내부 감사 보고서를 자동으로 생성해줘."
+        "input": "침해사고가 발생했을 때 사용자에게 보여줘도 돼?"
     }):
         print("🧩 단계 상태:")
         for k, v in step.items():

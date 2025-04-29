@@ -2,122 +2,162 @@ from models.llm import llm
 import json
 import re
 
-class FormatTool():
+class ReportFormatTool():
     name = "format_report"
-    description = "보고서 내용을 JSON 형태로 포매팅 (본문 제목과 소제목은 내용을 기반으로 동적으로 생성)"
     
     def _run(self, summary_text: str):
-        system_prompt = """
-        다음 보고서 내용을 바탕으로 아래 JSON 형식으로 포매팅하세요.
+        system_prompt = f"""
+        당신은 구조화된 리포트를 생성하기 위한 포매팅 어시스턴트입니다.
+
+        당신의 작업:
+        - 제공된 리포트 원문을 읽고,
+        - 아래 지침에 따라 필요한 내용을 적절히 특정한 JSON 구조로 포맷팅하세요.
 
         지침:
-        - 보고서의 "title", "author", "date"는 보고서 내용을 참고하여 가장 적절한 값을 선택하거나 생성하세요.
-        - "본문" 섹션의 제목과 소제목들은 보고서 내용을 바탕으로 가장 적절한 제목을 동적으로 생성하세요.
-        - 표나 그래프가 들어갈 위치는 "<table>" 또는 "<graph>"로 표시합니다.
+        - "title", "author", "date"는 리포트 내용을 기반으로 적절히 추출하거나 생성하세요.
+        - 본문 섹션("sections")은 동적으로 생성된 제목과 간단한 도입 문장을 포함해야 합니다.
+        - 본문에는 정확히 5개의 소주제를 포함해야 하며, 각 항목에는 다음이 포함되어야 합니다:
+            - 의미 있는 "title"
+            - 간결하고 명확한 "content" (2~3문장 내외)
+        - 전체 리포트는 300~400단어 이내로 구성되어야 하며,
+        - 지나치게 긴 문단이나 불필요한 설명은 피해야 합니다.
 
-        JSON 형식:
+        요구되는 최종 JSON 출력 예시는 다음과 같습니다:
+        ```json
         {{
-            "title": "<적절한 제목>",
-            "author": "<적절한 저자>",
-            "date": "<적절한 날짜>",
-            "sections": [
-                {{
-                    "title": "요약",
-                    "content": "<보고서의 핵심 요약>"
-                }},
-                {{
-                    "title": "<본문의 적절한 제목>",
-                    "content": "<본문 소개>",
-                    "subsections": [
-                        {{"title": "<소제목 1>", "content": "<내용 1>"}},
-                        {{"title": "<소제목 2>", "content": "<내용 2>"}},
-                        {{"title": "<소제목 3>", "content": "<table>"}},
-                        {{"title": "<소제목 4>", "content": "<graph>"}},
-                        {{"title": "<소제목 5>", "content": "<내용 5>"}}
-                    ]
-                }},
-                {{
-                    "title": "결론",
-                    "content": "<결론 내용>"
-                }}
+        "title": "<적절한 리포트 제목>",
+        "author": "<작성자 이름>",
+        "date": "<작성 날짜>",
+        "sections": [
+            {{
+            "title": "Summary",
+            "content": "<리포트 요약>"
+            }},
+            {{
+            "title": "<본문 제목>",
+            "content": "<본문 도입 내용>",
+            "subsections": [
+                {{ "title": "<소주제 1 제목>", "content": "<내용 1>" }},
+                {{ "title": "<소주제 2 제목>", "content": "<내용 2>" }},
+                {{ "title": "<소주제 3 제목>", "content": "<내용 3>" }},
+                {{ "title": "<소주제 4 제목>", "content": "<내용 4>" }},
+                {{ "title": "<소주제 5 제목>", "content": "<내용 5>" }}
             ]
+            }},
+            {{
+            "title": "Conclusion",
+            "content": "<결론 또는 핵심 인사이트>"
+            }}
+        ]
         }}
 
-        보고서 내용:
+        리포트 원문:
         {summary_text}
         """.strip()
 
+
         # formatted_json = llm.invoke(summary_text, system_prompt, 0.2)
-        formatted_json = llm.invoke("제타큐브는 탈중앙화 인프라 회사입니다", system_prompt, 0.2)
-        print(formatted_json)
+        response = llm.invoke(summary_text, system_prompt, 0.63)
         
-        return formatted_json
+        if isinstance(response, dict):
+            content = response.get("content") or response.get("reasoning_content") or ""
+        else:
+            content = str(response)
+        
+        return content
 
 def safe_parse_json_from_output(output: str) -> dict:
-    """LLM 응답에서 유효한 JSON만 추출 (백틱 없는 경우 포함)"""
+    """LLM 응답에서 유효한 JSON만 추출"""
 
-    # 1. 코드블록 ```json { ... } ``` 형식
-    match = re.search(r"```json\s*([\s\S]+?)\s*```", output)
+    # 문자열이 아닐 경우 str로 변환 (또는 실패 처리)
+    if not isinstance(output, str):
+        output = str(output)
+
+    # 1. ```json ... ``` 코드 블록
+    match = re.search(r"```(?:\s*json)?\s*([\s\S]+?)\s*```", output)
     if match:
         json_str = match.group(1)
-        return json.loads(json_str)
+        try:
+            return json.loads(json_str)
+        except json.JSONDecodeError:
+            pass
 
-    # 2. 'json\n{...}' 형식 (백틱 없이 LLM이 내보낸 경우)
+    # 2. json\n{...}
     match = re.search(r"json\s*\n\s*({[\s\S]+})", output)
     if match:
         json_str = match.group(1)
-        return json.loads(json_str)
+        try:
+            return json.loads(json_str)
+        except json.JSONDecodeError:
+            pass
 
-    # 3. 그냥 전체 문자열 자체가 JSON일 가능성
+    # 3. 전체가 JSON 문자열일 수 있음
     try:
         return json.loads(output.strip())
     except json.JSONDecodeError:
         pass
 
-    # 4. 실패 시
-    raise ValueError("유효한 JSON 블록을 찾을 수 없습니다.")
+    # 4. 실패
+    raise ValueError("❌ 유효한 JSON 블록을 찾을 수 없습니다.")
+
         
-def report_formatting(state: dict) -> dict:
-    """리포트 형식에 맞게 출력을 변환합니다."""
+async def formatting_report(state: dict, send_event=None) -> dict:
+    """이 도구는 리포트를 지정된 JSON 형식으로 포맷팅할 필요가 있을 때만 사용하세요."""
+
     plan_index = state.get('plan_index', 0)
-    summary_text = state.get("summary_text", "")
-    format_tool = FormatTool()
-
-    max_retries = 3
-    retry_count = 0
+    format_tool = ReportFormatTool()
+    summary_text = state.get("summary_text")
     formatted_report = None
-    last_error = None
 
-    while retry_count < max_retries:
+    # 1. summary_text 확보
+    if not summary_text:
+        output = state.get("output", {})
+        if isinstance(output, dict):
+            summary_text = output.get("summary")
+
+        if not summary_text:
+            for o in reversed(state.get("outputs", [])):
+                if isinstance(o, dict) and o.get("source") == "use_rag":
+                    summary_text = o.get("summary")
+                    break
+
+    if not summary_text:
+        return {
+            **state,
+            "output": "❌ summary_text가 비어 있습니다.",
+            "status": "❌ report_formatting 실패",
+            "plan_index": plan_index + 1,
+        }
+
+    # 2. LLM 호출 및 파싱
+    try:
         llm_output = format_tool._run(summary_text)
-        content = ""
-        if isinstance(llm_output, dict):
-            content = llm_output.get("content") or llm_output.get("reasoning_content") or ""
-        elif isinstance(llm_output, str):
-            content = llm_output
-        else:
-            content = str(llm_output)
+        raw_content = llm_output.get("content") if isinstance(llm_output, dict) else str(llm_output)
+        formatted_report = safe_parse_json_from_output(raw_content)
 
-        try:
-            if not content or not isinstance(content, str):
-                raise ValueError("LLM 응답에 content가 없거나 문자열이 아님")
-            formatted_report = safe_parse_json_from_output(content)
-            break  # 성공했으니 루프 탈출
-        except Exception as e:
-            last_error = str(e)
-            retry_count += 1
-            print(f"[RETRY] JSON 파싱 실패 ({retry_count}/{max_retries}) → {last_error}")
+    except Exception as e:
+        return {
+            **state,
+            "output": {"error": f"❌ JSON 파싱 실패: {str(e)}"},
+            "status": "❌ report_formatting 실패",
+            "plan_index": plan_index + 1,
+        }
 
-    if formatted_report is None:
-        formatted_report = {"error": f"최대 재시도 도달: {last_error}"}
+    # 3. 유효성 검사
+    if not isinstance(formatted_report, dict) or "sections" not in formatted_report:
+        return {
+            **state,
+            "output": {"error": "❌ JSON 구조 오류: 'sections'가 없음"},
+            "status": "❌ report_formatting 실패",
+            "plan_index": plan_index + 1,
+        }
 
-    formatted_state = {
+    # 4. 정상 리턴
+    return {
         **state,
-        "output": formatted_report,
-        "status": "🧮 report_formatting 도구 실행 완료",
+        "output": "▫️▫️⚙️ report_formatting 도구 실행 중",
+        "json_data": formatted_report,
+        "status": "🧮 PDF에 맞춰 변환:\n\n",
         "plan_index": plan_index + 1,
+        "__next__": "generate_report_pdf",
     }
-
-    print(f"[DEBUG] report_formatting 실행됨: {plan_index}", flush=True)
-
-    return formatted_state

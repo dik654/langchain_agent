@@ -1,70 +1,147 @@
-# from typing import Dict
+# from models.llm import llm
+# from typing import Dict, Union
+# import json
 
 # def finalize_answer(state: Dict) -> Dict:
-#     intent = state.get("intent")
-#     output = state.get("output")
-#     status = state.get("status", "")
+#     input_text = state.get("user_query", "") or state.get("input", "")
+#     context = state.get("context", "")
+#     outputs = state.get("outputs", [])
 
-#     if not output and intent == "none":
-#         user_input = state.get("input", "")
+#     download_buttons = []
+#     summarized_parts = []
 
-#         result = llm.invoke(user_input, system_prompt)
-#         output = result.get("content") if isinstance(result, dict) else result.content
+#     # 외부에서 접근 가능한 URL 경로
+#     STATIC_PDF_BASE_URL = "http://211.176.180.172:8001/static/pdf"
 
-#     elif not output:
-#         output = "⚠️ 도구 실행 결과가 없습니다."
+#     for o in outputs:
+#         if isinstance(o, dict) and "pdf_path" in o and "filename" in o:
+#             pdf_path = o["pdf_path"]
+#             filename = o["filename"]
 
-#     elif isinstance(output, dict):
-#         output = "\n".join(f"{k}: {v}" for k, v in output.items())
+#             # 내부 경로를 외부 URL로 변환
+#             if pdf_path.startswith("/home/filadmin/ai/langchain-venv/outputs/pdf"):
+#                 relative_path = pdf_path.replace("/home/filadmin/ai/langchain-venv/outputs/pdf", "").lstrip("/")
+#                 url_path = f"{STATIC_PDF_BASE_URL}/{relative_path}"
 
-#     elif isinstance(output, list):
-#         output = "\n".join(str(v) for v in output)
+#                 button_html = f"""
+# <a href="{url_path}" download="{filename}" style="
+#     display: inline-block;
+#     background-color: #4CAF50;
+#     color: white;
+#     padding: 8px 16px;
+#     text-align: center;
+#     text-decoration: none;
+#     border-radius: 6px;
+#     font-weight: bold;
+#     margin-top: 10px;
+# ">📄 PDF 다운로드</a>
+# """
+#                 download_buttons.append(button_html)
+#         else:
+#             summarized_parts.append(
+#                 json.dumps(o, ensure_ascii=False, indent=2) if isinstance(o, dict) else str(o)
+#             )
 
-#     final_output = "\n\n".join([
-#         "🎉 모든 작업이 완료되었습니다.",
-#         status,
-#         output
-#     ])
+#     summarized_text = "\n".join(summarized_parts)
+#     button_block = "\n".join(download_buttons)
 
-#     print(f"[FINALIZE DEBUG] 최종 출력:\n{final_output}")
+#     if summarized_text:
+#         prompt = f"""
+#     다음은 사용 가능한 도구들을 통해 얻은 결과입니다.  
+#     해당 정보를 바탕으로 사용자의 질문에 적절히 요약하여 응답해 주세요.
 
+#     [사용자 질문]
+#     {input_text}
+
+#     [도구 출력 결과]
+#     {summarized_text}
+#     """.strip()
+#     else:
+#         prompt = f"""
+#     아래 사용자 질문에 대해 **어떠한 도구도 사용하지 않고** 직접 응답해 주세요.  
+#     간결하고 핵심적인 정보를 중심으로 대답해 주세요.
+
+#     [사용자 질문]
+#     {input_text}
+
+#     [참고 문맥]
+#     {context}
+#     """.strip()
+
+#     print("@@@@@ user_query:", input_text)
+#     print("@@@@@ prompt:", prompt)
+
+#     result = llm.invoke(input_text, prompt)
+#     response = None
+#     if isinstance(result, dict):
+#         response = result.get("content")
+#     elif hasattr(result, "content"):
+#         response = result.content
+
+#     if not response:
+#         response = "❗답변 생성에 실패했습니다. 다시 시도해 주세요."
+
+#     final_response = response + "\n\n" + button_block
 #     return {
 #         **state,
-#         "output": final_output,
-#         "status": "✅ 흐름 종료"
+#         "output": final_response,
+#         "status": "✅ 최종 응답 완료",
 #     }
 
-# logic/finalizer.py
+from typing import Dict
+import json
 
-def finalize_answer(state: dict) -> dict:
-    outputs = state.get("outputs", [])
-    final_output = outputs[-1] if outputs else {}
+def finalize_answer(state: Dict) -> Dict:
+    outputs = state.get("pdf_path", [])
+    download_buttons = []
+    summarized_parts = []
 
-    message = "🎉 모든 작업이 완료되었습니다."
+    STATIC_PDF_BASE_URL = "http://192.168.10.1:8001/static/pdf"
 
-    if isinstance(final_output, dict):
-        # PDF 결과
-        if "pdf_path" in final_output:
-            message = f"✅ PDF 보고서가 생성되었습니다!\n📄 경로: {final_output['pdf_path']}"
+    print(outputs)
+    for o in outputs:
+        if isinstance(o, dict) and "pdf_path" in o and "filename" in o:
+            pdf_path = o["pdf_path"]
+            filename = o["filename"]
 
-        # RAG 결과
-        elif "summary" in final_output:
-            message = f"🧠 요약 완료:\n{final_output['summary']}"
+            if pdf_path.startswith("/home/filadmin/ai/langchain-venv/outputs/pdf"):
+                relative_path = pdf_path.replace("/home/filadmin/ai/langchain-venv/outputs/pdf", "").lstrip("/")
+                url_path = f"{STATIC_PDF_BASE_URL}/{relative_path}"
 
-        # 오류 메시지
-        elif "error" in final_output:
-            message = f"❌ 오류 발생: {final_output['error']}"
-
-        # 그 외 dict 결과
+                button_html = f"""
+<a href="{url_path}" download="{filename}" style="
+    display: inline-block;
+    background-color: #4CAF50;
+    color: white;
+    padding: 8px 16px;
+    text-align: center;
+    text-decoration: none;
+    border-radius: 6px;
+    font-weight: bold;
+    margin-top: 10px;
+">📄 PDF 다운로드</a>
+"""
+                download_buttons.append(button_html)
         else:
-            message = f"📋 결과:\n{final_output}"
+            summarized_parts.append(
+                json.dumps(o, ensure_ascii=False, indent=2) if isinstance(o, dict) else str(o)
+            )
 
-    elif isinstance(final_output, str):
-        message = final_output  # 예: "🔍 RAG 실행 결과 (모킹)"
+    button_block = "\n".join(download_buttons)
+
+    # ✅ 여기에서 조건 처리
+    if download_buttons:
+        response = "- 모든 과정이 완료되었습니다. -"
+    elif summarized_parts:
+        response = "- 일부 결과만 요약되었습니다. -\n\n" + "\n".join(summarized_parts)
+    else:
+        response = "❗최종 결과를 출력할 수 없습니다."
+
+    final_response = response + "\n\n" + button_block
+    print(final_response)
 
     return {
         **state,
-        "status": "✅ 흐름 종료",
-        "output": message
+        "output": "",
+        "status": final_response,
     }
-

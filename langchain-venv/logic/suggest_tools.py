@@ -22,5 +22,5 @@ def suggest_available_tools(state: dict) -> dict:
     return {
         **state,
         "tool_info": tool_info,
-        "status": "🧰 사용 가능한 툴을 분석했습니다."
+        "status": "🧰 사용 가능한 툴을 분석 중입니다.\n\n"
     }

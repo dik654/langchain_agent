@@ -1,0 +1,77 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage{fontspec}
+\setmainfont{NanumGothic}
+
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+\usepackage{graphicx}
+\usepackage{setspace}
+\usepackage{array}
+\usepackage{titlesec}
+\usepackage{tikz}
+\usepackage{enumitem}
+\linespread{1.6}
+
+\titleformat{\section}{\normalfont\Large\bfseries}{\thesection}{1em}{}
+
+% 워터마크 로고
+\AddToShipoutPictureBG{
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[opacity=0.08, inner sep=0pt] at (current page.center) {
+      \includegraphics[width=0.5\paperwidth]{outputs/pdf/company_logo.png}
+    };
+  \end{tikzpicture}
+}
+
+\begin{document}
+
+\begin{center}
+    {\LARGE \textbf{회의록}}\\
+    \vspace{1em}
+    {\Large \textbf{{{{ title }}}}}\\
+    \vspace{0.5em}
+    {\normalsize (Meeting Minutes)}
+\end{center}
+
+\vspace{1.5em}
+
+\begin{tabular}{|p{4cm}|p{10cm}|}
+    \hline
+    \textbf{회의 제목} & {{ title }} \\
+    \hline
+    \textbf{일시} & {{ datetime }} \\
+    \hline
+    \textbf{장소} & {{ location }} \\
+    \hline
+    \textbf{참석자} & 
+    \begin{itemize}[leftmargin=*, noitemsep]
+      {% for attendee in attendees %}
+        \item {{ attendee }}
+      {% endfor %}
+    \end{itemize} \\
+    \hline
+    \textbf{회의 안건} & 
+    \begin{itemize}[leftmargin=*, noitemsep]
+      {% for topic in agenda %}
+        \item {{ topic }}
+      {% endfor %}
+    \end{itemize} \\
+    \hline
+    \textbf{회의 내용 요약} & {{ summary }} \\
+    \hline
+    \textbf{결정 사항 및 Action Item} & 
+    \begin{itemize}[leftmargin=*, noitemsep]
+      {% for decision in decisions %}
+        \item {{ decision }}
+      {% endfor %}
+    \end{itemize} \\
+    \hline
+\end{tabular}
+
+\vspace{2em}
+
+\begin{flushright}
+    \textbf{기록자:} \underline{{{{ recorder }}}}
+\end{flushright}
+
+\end{document}
